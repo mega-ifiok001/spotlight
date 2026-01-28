@@ -10,6 +10,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Form } from '@/components/ui/form'
+import { useAttendeeStore } from '@/store/useAttendeeStore'
 import { WebinarStatusEnum } from '@prisma/client'
 import React, { useState } from 'react'
 
@@ -30,6 +31,9 @@ const WaitListComponent = ({
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+
+
+  const {setAttendee } = useAttendeeStore()
 
   const buttonText = () => {
     switch (webinarStatus) {
