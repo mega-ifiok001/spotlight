@@ -3,6 +3,7 @@
 import { prismaClient } from "@/lib/prismaClient"
 import { AttendanceData } from "@/lib/type"
 import { AttendedTypeEnum, CtaTypeEnum } from "@prisma/client"
+import { revalidatePath } from "next/cache"
 
 export const getWebinarAttendance = async (
   webinarId: string,
@@ -96,4 +97,101 @@ export const getWebinarAttendance = async (
     console.error("Failed to fetch attendance data:", error)
     return { success: false, error: "Failed to fetch attendance data" }
   }
+}
+
+
+
+export const registerAttendee = async ({
+    webinarId,
+    email,
+    name,
+}: {
+    webinarId: string
+    email: string
+    name: string 
+}) => {
+    try {
+        if(!webinarId || !email){
+           return {
+             success: false,
+            status: 400,
+            message: 'Missing required paramaters',
+           }
+        }
+
+        const webinar = await prismaClient.webinar.findUnique({
+            where: {id: webinarId },
+        })
+
+        if(!webinar){
+            return {
+                success: false,
+                status: 404,
+                message: 'Webinar not found'
+            }
+        }
+
+
+        // find or create the attendee by email
+        let attendee = await prismaClient.attendee.findUnique({
+            where: {email},
+        })
+
+        if(!attendee){
+            attendee = await prismaClient.attendee.create({
+                data: {email, name},
+            })
+        }
+
+        // Create attendee record
+        const existingAttendance = await prismaClient.attendance.findFirst({
+           where: {
+            attendeeId: attendee.id,
+            webinarId: webinarId
+           },
+           include: {
+            user: true,
+           },
+        })
+
+        if(existingAttendance){
+          return{
+            success: true,
+            status: 200,
+            data: existingAttendance,
+            message: 'You are already registered for this webinar',
+          }
+        }
+
+
+        // create attendance record
+        const attendance = await prismaClient.attendance.create({
+        data: {
+          attendedType: AttendedTypeEnum.REGISTERED,
+          attendeeId: attendee.id,
+          webinarId: webinarId,
+        },
+        include: {
+          user: true,
+        }, 
+        })
+
+        revalidatePath(`/${webinarId}`)
+
+        return{
+          success: true,
+          status: 200,
+          data: attendance,
+          message: 'Successfully Registered'
+        }
+        
+    } catch (error) {
+      console.error('Registration Error', error)
+      return{
+        success: false,
+        status:500,
+        error: error,
+        message: 'Something went wrong',
+      }
+    }
 }
